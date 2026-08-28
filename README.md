@@ -1,3 +1,10 @@
+> **Note**: This repository is a fork of upstream [Chawan](https://git.sr.ht/~bptato/chawan) by bptato.
+> 
+> **Custom Additions (AI-assisted)**:
+> - **Kitty Graphics Protocol Unicode Placeholders (`U=1`)**: Supports native Kitty images inside `tmux` without ghosting, flickering, or burned-in artifacts when switching windows or scrolling.
+> - **Automatic tmux DCS Passthrough Wrapping**: Automatically wraps APC graphics escape sequences in DCS passthrough when inside tmux.
+> - **Nerd Font Image Placeholder**: Replaced standard `[img]` fallback text with the Nerd Font `` (U+F03E) icon.
+
 [Chawan](https://chawan.net) is a TUI web (and (S)FTP, Gopher, Gemini,
 ...) browser with CSS, inline image and JavaScript support.
 

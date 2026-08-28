@@ -604,8 +604,8 @@ proc renderBlock(grid: var FlexibleGrid; state: var RenderState;
     grid.paintBorder(state, offset, endOffset, box)
     if box.computed{"background-image"} != nil:
       # ugly hack for background-image display... TODO actually display images
-      const s = "[img]"
-      let w = s.len.toLUnit() * state.cellSize.w
+      const s = ""
+      let w = s.width().toLUnit() * state.cellSize.w
       var offset = offset
       if box.state.size.w < w:
         # text is larger than image; center it to minimize error

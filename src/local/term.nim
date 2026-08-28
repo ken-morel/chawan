@@ -104,6 +104,7 @@ type
     scrolled: bool # sixel only: set if screen was scrolled since printing
     preludeLen: int
     kittyId: uint
+    uploaded: bool # kitty+tmux: true after virtual placement (U=1) was sent
     data: Blob
     next: CanvasImage
 
@@ -687,6 +688,82 @@ proc write(term: Terminal; s: openArray[char]): Opt[void] =
 
 proc write(term: Terminal; c: char): Opt[void] =
   term.write([c])
+
+proc writeKitty(term: Terminal; s: openArray[char]): Opt[void] =
+  if term.termType == ttTmux or getEnv("TMUX") != "":
+    var wrapped = newStringOfCap(s.len + 32)
+    wrapped.add("\ePtmux;")
+    for c in s:
+      if c == '\e':
+        wrapped.add("\e\e")
+      else:
+        wrapped.add(c)
+    wrapped.add("\e\\")
+    term.write(wrapped)
+  else:
+    term.write(s)
+
+# Row/column diacritics table from the Kitty graphics protocol spec.
+# Used to encode row/column numbers as Unicode combining characters
+# in Kitty Unicode placeholder cells (U+10EEEE).
+# See: https://sw.kovidgoyal.net/kitty/graphics-protocol/#unicode-placeholder
+# Same table as used by yazi, mpv, and kitten icat.
+const KittyDiacritics: array[297, uint32] = [
+  0x305u32, 0x30d, 0x30e, 0x310, 0x312, 0x33d, 0x33e, 0x33f,
+  0x346, 0x34a, 0x34b, 0x34c, 0x350, 0x351, 0x352, 0x357,
+  0x35b, 0x363, 0x364, 0x365, 0x366, 0x367, 0x368, 0x369,
+  0x36a, 0x36b, 0x36c, 0x36d, 0x36e, 0x36f, 0x483, 0x484,
+  0x485, 0x486, 0x487, 0x592, 0x593, 0x594, 0x595, 0x597,
+  0x598, 0x599, 0x59c, 0x59d, 0x59e, 0x59f, 0x5a0, 0x5a1,
+  0x5a8, 0x5a9, 0x5ab, 0x5ac, 0x5af, 0x5c4, 0x610, 0x611,
+  0x612, 0x613, 0x614, 0x615, 0x616, 0x617, 0x657, 0x658,
+  0x659, 0x65a, 0x65b, 0x65d, 0x65e, 0x6d6, 0x6d7, 0x6d8,
+  0x6d9, 0x6da, 0x6db, 0x6dc, 0x6df, 0x6e0, 0x6e1, 0x6e2,
+  0x6e4, 0x6e7, 0x6e8, 0x6eb, 0x6ec, 0x730, 0x732, 0x733,
+  0x735, 0x736, 0x73a, 0x73d, 0x73f, 0x740, 0x741, 0x743,
+  0x745, 0x747, 0x749, 0x74a, 0x7eb, 0x7ec, 0x7ed, 0x7ee,
+  0x7ef, 0x7f0, 0x7f1, 0x7f3, 0x816, 0x817, 0x818, 0x819,
+  0x81b, 0x81c, 0x81d, 0x81e, 0x81f, 0x820, 0x821, 0x822,
+  0x823, 0x825, 0x826, 0x827, 0x829, 0x82a, 0x82b, 0x82c,
+  0x82d, 0x951, 0x953, 0x954, 0xf82, 0xf83, 0xf86, 0xf87,
+  0x135d, 0x135e, 0x135f, 0x17dd, 0x193a, 0x1a17, 0x1a75, 0x1a76,
+  0x1a77, 0x1a78, 0x1a79, 0x1a7a, 0x1a7b, 0x1a7c, 0x1b6b, 0x1b6d,
+  0x1b6e, 0x1b6f, 0x1b70, 0x1b71, 0x1b72, 0x1b73, 0x1cd0, 0x1cd1,
+  0x1cd2, 0x1cda, 0x1cdb, 0x1ce0, 0x1dc0, 0x1dc1, 0x1dc3, 0x1dc4,
+  0x1dc5, 0x1dc6, 0x1dc7, 0x1dc8, 0x1dc9, 0x1dcb, 0x1dcc, 0x1dd1,
+  0x1dd2, 0x1dd3, 0x1dd4, 0x1dd5, 0x1dd6, 0x1dd7, 0x1dd8, 0x1dd9,
+  0x1dda, 0x1ddb, 0x1ddc, 0x1ddd, 0x1dde, 0x1ddf, 0x1de0, 0x1de1,
+  0x1de2, 0x1de3, 0x1de4, 0x1de5, 0x1de6, 0x1dfe, 0x20d0, 0x20d1,
+  0x20d4, 0x20d5, 0x20d6, 0x20d7, 0x20db, 0x20dc, 0x20e1, 0x20e7,
+  0x20e9, 0x20f0, 0x2cef, 0x2cf0, 0x2cf1, 0x2de0, 0x2de1, 0x2de2,
+  0x2de3, 0x2de4, 0x2de5, 0x2de6, 0x2de7, 0x2de8, 0x2de9, 0x2dea,
+  0x2deb, 0x2dec, 0x2ded, 0x2dee, 0x2def, 0x2df0, 0x2df1, 0x2df2,
+  0x2df3, 0x2df4, 0x2df5, 0x2df6, 0x2df7, 0x2df8, 0x2df9, 0x2dfa,
+  0x2dfb, 0x2dfc, 0x2dfd, 0x2dfe, 0x2dff, 0xa66f, 0xa67c, 0xa67d,
+  0xa6f0, 0xa6f1, 0xa8e0, 0xa8e1, 0xa8e2, 0xa8e3, 0xa8e4, 0xa8e5,
+  0xa8e6, 0xa8e7, 0xa8e8, 0xa8e9, 0xa8ea, 0xa8eb, 0xa8ec, 0xa8ed,
+  0xa8ee, 0xa8ef, 0xa8f0, 0xa8f1, 0xaab0, 0xaab2, 0xaab3, 0xaab7,
+  0xaab8, 0xaabe, 0xaabf, 0xaac1, 0xfe20, 0xfe21, 0xfe22, 0xfe23,
+  0xfe24, 0xfe25, 0xfe26, 0x10a0f, 0x10a38, 0x1d185, 0x1d186, 0x1d187,
+  0x1d188, 0x1d189, 0x1d1aa, 0x1d1ab, 0x1d1ac, 0x1d1ad, 0x1d242,
+  0x1d243, 0x1d244
+]
+
+# UTF-8 encode a diacritic by its row/column index (0..296).
+# Clamps to the last entry if out of range (images > 296 cells wide/tall).
+proc kittyDiacritic(n: int): string {.inline.} =
+  toUTF8(KittyDiacritics[min(n, KittyDiacritics.high)])
+
+# Returns true when we should use Unicode placeholder rendering.
+# This is only needed inside tmux, where direct pixel placement leaves
+# images "burnt in" when switching windows because tmux has no knowledge
+# of Ghostty's Kitty image layer. Unicode placeholders are just text chars
+# (U+10EEEE) that tmux moves/erases normally, automatically removing images.
+proc useUnicodePlaceholders(term: Terminal): bool {.inline.} =
+  term.imageMode == imKitty and
+    (term.termType == ttTmux or getEnv("TMUX") != "")
+
+
 
 proc readChar(term: Terminal): Opt[char] =
   if term.ibufn == term.ibufLen:
@@ -1972,6 +2049,7 @@ proc clearImage(term: Terminal; image: CanvasImage; maxh: int) =
   of imKitty:
     if image.kittyId != 0:
       term.frame.kittyImagesToClear.add(image.kittyId)
+      image.uploaded = false # allow re-upload if image re-enters viewport
 
 proc clearImages*(term: Terminal; maxh: int) =
   for image in term.frame.canvasImages:
@@ -2177,8 +2255,11 @@ proc outputSixelImage(term: Terminal; x, y: int; image: CanvasImage):
     ?term.outputSixelImage(x, y, image, p.toOpenArray(0, H))
   ok()
 
-proc outputKittyImage(term: Terminal; x, y: int; image: CanvasImage):
+
+proc outputKittyImageDirect(term: Terminal; x, y: int; image: CanvasImage):
     Opt[void] =
+  # Direct pixel placement path (used outside tmux).
+  # Sends a=T with pixel-precise offsets; no tmux passthrough issues here.
   ?term.cursorGoto(x, y)
   # ignore offx2/offy2 if the image starts outside the screen (and thus we
   # are painting a slice only)
@@ -2194,7 +2275,7 @@ proc outputKittyImage(term: Terminal; x, y: int; image: CanvasImage):
     ",p=1,q=2"
   if image.kittyId != 0:
     outs &= ",i=" & $image.kittyId & ",a=p;" & ST
-    return term.write(outs)
+    return term.writeKitty(outs)
   inc term.kittyId # skip i=0
   if term.kittyId == 0: # unsigned wraparound
     inc term.kittyId
@@ -2208,7 +2289,7 @@ proc outputKittyImage(term: Terminal; x, y: int; image: CanvasImage):
   outs &= ",a=T,f=100,m=" & m & ';'
   outs.btoa(p.toOpenArray(0, min(L, i) - 1))
   outs &= ST
-  ?term.write(outs)
+  ?term.writeKitty(outs)
   while i < L:
     let j = i
     i += MaxBytes
@@ -2216,16 +2297,101 @@ proc outputKittyImage(term: Terminal; x, y: int; image: CanvasImage):
     var outs = APC & "Gm=" & m & ';'
     outs.btoa(p.toOpenArray(j, min(L, i) - 1))
     outs &= ST
-    ?term.write(outs)
+    ?term.writeKitty(outs)
+  ok()
+
+proc outputKittyImagePlaceholder(term: Terminal; x, y: int;
+    image: CanvasImage): Opt[void] =
+  # Unicode placeholder path (used inside tmux).
+  # Mirrors exactly what yazi (kgp.rs) does:
+  #   1. Upload image data as a virtual placement (a=T,C=1,U=1,q=2).
+  #      The image is stored by Ghostty but not yet displayed.
+  #   2. Place U+10EEEE cells with row+col diacritics and fg=imageId.
+  #      Ghostty maps those cells to the virtual placement and renders it.
+  #      tmux sees them as ordinary text – when switching windows it erases
+  #      them, and Ghostty removes the image automatically.
+  #
+  let ppc = max(1, term.attrs.ppc)
+  let ppl = max(1, term.attrs.ppl)
+  let totalCols = max(1, (image.dims.width + ppc - 1) div ppc)
+  let totalRows = max(1, (image.dims.height + ppl - 1) div ppl)
+  # Step 1: Upload (once per image instance).
+  if not image.uploaded:
+    inc term.kittyId
+    if term.kittyId == 0:
+      inc term.kittyId
+    image.kittyId = term.kittyId
+    const MaxBytes = 4096 * 3 div 4
+    var i = MaxBytes
+    let p = cast[ptr UncheckedArray[uint8]](image.data.buffer)
+    let L = image.data.size
+    let m = if i < L: '1' else: '0'
+    # a=T  transmit
+    # C=1  no cursor movement (same as yazi)
+    # U=1  virtual placement for Unicode placeholder mode
+    # f=100 PNG-encoded data
+    # q=2  quiet (suppress APC responses that would confuse our input parser)
+    # s=, v= pixel dimensions; c=, r= virtual grid dimensions
+    var outs = APC & "Ga=T,C=1,U=1,f=100,q=2" &
+      ",i=" & $image.kittyId &
+      ",s=" & $image.dims.width &
+      ",v=" & $image.dims.height &
+      ",c=" & $totalCols &
+      ",r=" & $totalRows &
+      ",m=" & m & ';'
+    outs.btoa(p.toOpenArray(0, min(L, i) - 1))
+    outs &= ST
+    ?term.writeKitty(outs)
+    while i < L:
+      let j = i
+      i += MaxBytes
+      let m = if i < L: '1' else: '0'
+      var chunk = APC & "Gm=" & m & ';'
+      chunk.btoa(p.toOpenArray(j, min(L, i) - 1))
+      chunk &= ST
+      ?term.writeKitty(chunk)
+    image.uploaded = true
+  # Step 2: Place placeholder cells.
+  let colStart = image.dims.offx div ppc
+  let rowStart = image.dims.offy div ppl
+  let dispCols = min(totalCols - colStart, max(1, (image.dims.dispw - image.dims.offx + ppc - 1) div ppc))
+  let dispRows = min(totalRows - rowStart, max(1, (image.dims.disph - image.dims.offy + ppl - 1) div ppl))
+  # Encode image ID as a 24-bit true-color foreground.
+  # Ghostty reads this color from each U+10EEEE cell to map it to the
+  # correct virtual placement.
+  let id = image.kittyId
+  let r = uint8((id shr 16) and 0xFF)
+  let g = uint8((id shr 8) and 0xFF)
+  let b = uint8(id and 0xFF)
+  let fgOn = "\e[38;2;" & $r & ";" & $g & ";" & $b & "m"
+  let fgOff = "\e[39m"
+  # U+10EEEE as UTF-8: F4 8E BB AE
+  const PlaceholderCP = "\xF4\x8E\xBB\xAE"
+  for row in 0 ..< dispRows:
+    term.unsetCursorPos()
+    ?term.cursorGoto(x, y + row)
+    var line = fgOn
+    for col in 0 ..< dispCols:
+      line &= PlaceholderCP
+      line &= kittyDiacritic(rowStart + row)
+      line &= kittyDiacritic(colStart + col)
+    line &= fgOff
+    # NOTE: Must use term.write (not writeKitty) because these placeholder
+    # cells are regular text characters intended for tmux's screen buffer!
+    ?term.write(line)
+    term.unsetCursorPos()
   ok()
 
 proc outputImages(term: Terminal): Opt[void] =
   if term.imageMode == imKitty:
-    # clean up unused kitty images
-    var s = ""
+    # Clean up images that scrolled off screen.
+    # In placeholder mode, also overwrite the old placeholder cells with spaces
+    # before sending the deletion APC (same strategy as yazi's image_erase).
+    var deletes = ""
     for id in term.frame.kittyImagesToClear:
-      s &= APC & "Ga=d,d=I,i=" & $id & ",p=1,q=2;" & ST
-    ?term.write(s)
+      deletes &= APC & "Ga=d,d=I,i=" & $id & ",q=2;" & ST
+    if deletes.len > 0:
+      ?term.writeKitty(deletes)
     term.frame.kittyImagesToClear.setLen(0)
   for image in term.frame.canvasImages:
     if image.damaged:
@@ -2236,9 +2402,14 @@ proc outputImages(term: Terminal): Opt[void] =
       case term.imageMode
       of imNone: assert false
       of imSixel: ?term.outputSixelImage(x, y, image)
-      of imKitty: ?term.outputKittyImage(x, y, image)
+      of imKitty:
+        if term.useUnicodePlaceholders():
+          ?term.outputKittyImagePlaceholder(x, y, image)
+        else:
+          ?term.outputKittyImageDirect(x, y, image)
       image.damaged = false
   ok()
+
 
 proc clearCanvas*(term: Terminal) =
   term.cleared = false
@@ -2285,14 +2456,20 @@ proc scrollUp*(term: Terminal; n, scrollBottom: int) =
       image = next
       continue
     if term.imageMode == imKitty:
-      # Kitty exhibits strange behavior on scroll up:
-      # * if the image touches the scroll boundary on the bottom, and is
-      #   cropped on the top, then the image fails to scroll.
-      # * otherwise, the image is cropped, but the cropping code is
-      #   apparently glitched.
-      # So we just mark all images as damaged in this case; repainting Kitty
-      # is cheap anyway.
-      image.damaged = true
+      if term.useUnicodePlaceholders():
+        # In placeholder mode, the U+10EEEE cells scroll with the tmux cell
+        # grid naturally – no repaint needed. Just update dims so chawan
+        # knows where the image is.
+        discard
+      else:
+        # Kitty exhibits strange behavior on scroll up with direct placement:
+        # * if the image touches the scroll boundary on the bottom, and is
+        #   cropped on the top, then the image fails to scroll.
+        # * otherwise, the image is cropped, but the cropping code is
+        #   apparently glitched.
+        # So we just mark all images as damaged in this case; repainting Kitty
+        # is cheap anyway.
+        image.damaged = true
     # scroll up does not change offy or erry (the slice's start).
     image.dims.offy = offy
     image.dims.erry = erry
@@ -2335,9 +2512,13 @@ proc scrollDown*(term: Terminal; n, scrollBottom: int) =
       image = next
       continue
     if term.imageMode == imKitty:
-      # scroll down seems to work in Kitty, but not in Ghostty :(
-      # so we apply the same workaround.
-      image.damaged = true
+      if term.useUnicodePlaceholders():
+        # In placeholder mode, U+10EEEE cells scroll with the cell grid.
+        discard
+      else:
+        # scroll down seems to work in Kitty, but not in Ghostty :(
+        # so we apply the same workaround.
+        image.damaged = true
     # scroll down doesn't change disph (the slice's end).
     image.dims.disph = disph
     prev = image
@@ -2498,7 +2679,7 @@ proc queryAttrs(term: Terminal; windowOnly: bool): Opt[void] =
         ?term.write(QueryXtermWindowOps)
       if term.config{"imageMode"}.isNone:
         if tfBleedsAPC notin term.desc:
-          ?term.write(KittyQuery)
+          ?term.writeKitty(KittyQuery)
         ?term.write(QueryColorRegisters)
       elif term.config{"imageMode"}.get == imSixel:
         ?term.write(QueryColorRegisters)
@@ -2558,6 +2739,8 @@ proc parseTERM(term: Terminal): TerminalType =
   if s.startsWith("screen."):
     res = ttScreen
   # tmux says it's screen, but it isn't.
+  if getEnv("TMUX") != "":
+    return ttTmux
   if res == ttScreen and getEnv("TMUX") != "":
     return ttTmux
   when defined(freebsd):

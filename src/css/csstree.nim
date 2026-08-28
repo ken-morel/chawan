@@ -406,7 +406,7 @@ proc addImage(frame: var TreeFrame; bmp: NetworkBitmap) =
   if bmp == nil or bmp.cacheId == -1:
     # Add a placeholder text if we have no bmp.
     # (If we have bmp, render will take care of it automatically.)
-    frame.addText("[img]")
+    frame.addText("")
 
 proc addImageOrAlt(frame: var TreeFrame; image: HTMLImageElement) =
   let bmp = image.bitmap
@@ -417,7 +417,7 @@ proc addImageOrAlt(frame: var TreeFrame; image: HTMLImageElement) =
     if alt != "":
       frame.addText(alt)
     else:
-      frame.addText("[img]")
+      frame.addText("")
 
 proc addBr(frame: var TreeFrame) =
   frame.add(StyledNode(
