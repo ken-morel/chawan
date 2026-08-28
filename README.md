@@ -1,10 +1,10 @@
 > **Note**: This is a fork of upstream [Chawan](https://git.sr.ht/~bptato/chawan) by bptato.
 > 
 > **What's different in this fork**:
-> - **Images work cleanly inside tmux**: Automatically integrates with tmux so Kitty graphics display properly without ghosting, flickering, or getting stuck on screen when switching windows or scrolling.
+> - **Images work inside tmux**: Integrates with tmux so Kitty graphics display without ghosting or getting stuck on screen when switching windows or scrolling.
 > - **Nerd Font Image Icon**: Replaces the default text `[img]` placeholder with a nice Nerd Font icon (``).
 > 
-> *(These additions were developed with AI assistance)*
+> *(These additions were developed with AI assistance and are still experimental / not perfect yet — some quirks may still occur)*
 
 [Chawan](https://chawan.net) is a TUI web (and (S)FTP, Gopher, Gemini,
 ...) browser with CSS, inline image and JavaScript support.
