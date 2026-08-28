@@ -2075,6 +2075,8 @@ proc checkImageDamage(term: Terminal; image: CanvasImage; maxw, maxh: int) =
     if od > mx0:
       continue
     image.damaged = true
+    if term.useUnicodePlaceholders():
+      continue
     if od < x:
       continue
     # If eypx is less than y * ppl, that means it only partially covers
@@ -2531,9 +2533,17 @@ proc draw*(term: Terminal; redraw, mouse: bool;
     cursorx, cursory, scrollBottom: int; bgcolor: CellColor): Opt[void] =
   if redraw:
     if not term.cleared:
+      if term.useUnicodePlaceholders():
+        for image in term.frame.canvasImages:
+          image.damaged = true
       ?term.fullDraw()
       term.cleared = true
     else:
+      if term.useUnicodePlaceholders():
+        let maxw = term.attrs.width
+        let maxh = term.attrs.height
+        for image in term.frame.canvasImages:
+          term.checkImageDamage(image, maxw, maxh)
       ?term.partialDraw(scrollBottom, bgcolor)
     if term.imageMode != imNone:
       ?term.outputImages()
